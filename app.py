@@ -1,54 +1,55 @@
-from flask import Flask, redirect, url_for, request
+import os
 import sqlite3
+from flask import Flask, redirect, url_for, request
 
 app = Flask(__name__)
 
+DB_PATH = os.environ.get("DB_PATH", "data.db")
+
+def connect():
+    return sqlite3.connect(DB_PATH)
+
 def init_db():
-    conn = sqlite3.connect("data.db")
+    conn = connect()
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS counter (
             id INTEGER PRIMARY KEY,
-            value INTEGER
+            value INTEGER NOT NULL
         )
     """)
-    c.execute("SELECT COUNT(*) FROM counter")
-    if c.fetchone()[0] == 0:
-        c.execute("INSERT INTO counter (id, value) VALUES (1, 0)")
+    # sorgt dafür, dass id=1 existiert (ohne doppelte Einträge)
+    c.execute("INSERT OR IGNORE INTO counter (id, value) VALUES (1, 0)")
     conn.commit()
     conn.close()
 
 def get_total():
-    conn = sqlite3.connect("data.db")
+    init_db()
+    conn = connect()
     c = conn.cursor()
     c.execute("SELECT value FROM counter WHERE id = 1")
     value = c.fetchone()[0]
     conn.close()
     return value
 
-def increment():
-    conn = sqlite3.connect("data.db")
+def change_total(delta: int):
+    init_db()
+    conn = connect()
     c = conn.cursor()
-    c.execute("UPDATE counter SET value = value + 1 WHERE id = 1")
+    if delta == 1:
+        c.execute("UPDATE counter SET value = value + 1 WHERE id = 1")
+    else:
+        c.execute("""
+            UPDATE counter
+            SET value = CASE WHEN value > 0 THEN value - 1 ELSE 0 END
+            WHERE id = 1
+        """)
     conn.commit()
     conn.close()
 
-def decrement():
-    conn = sqlite3.connect("data.db")
-    c = conn.cursor()
-    c.execute("""
-        UPDATE counter 
-        SET value = CASE 
-            WHEN value > 0 THEN value - 1 
-            ELSE 0 
-        END
-        WHERE id = 1
-    """)
-    conn.commit()
-    conn.close()
-    
 def reset_counter():
-    conn = sqlite3.connect("data.db")
+    init_db()
+    conn = connect()
     c = conn.cursor()
     c.execute("UPDATE counter SET value = 0 WHERE id = 1")
     conn.commit()
@@ -60,51 +61,31 @@ def index():
     return f"""
     <html>
     <head>
-        <style>
-            body {{
-                text-align: center;
-                font-family: Arial;
-                margin-top: 100px;
-            }}
-            .big-button {{
-                font-size: 60px;
-                padding: 40px 80px;
-                border-radius: 20px;
-                border: none;
-                background-color: #4CAF50;
-                color: white;
-                margin: 20px;
-            }}
-            .reset-button {{
-                font-size: 20px;
-                padding: 10px 20px;
-                border-radius: 10px;
-                border: none;
-                background-color: #e74c3c;
-                color: white;
-                margin-top: 40px;
-            }}
-            .counter {{
-                font-size: 40px;
-                margin-top: 40px;
-            }}
-        </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        body {{ text-align: center; font-family: Arial; margin-top: 100px; }}
+        .big-button {{ font-size: 60px; padding: 40px 80px; border-radius: 20px; border: none; color: white; margin: 20px; }}
+        .plus {{ background-color: #4CAF50; }}
+        .minus {{ background-color: #f39c12; }}
+        .reset {{ font-size: 20px; padding: 10px 20px; border-radius: 10px; border: none; background-color: #e74c3c; color: white; margin-top: 40px; }}
+        .counter {{ font-size: 40px; margin-top: 40px; }}
+        .row {{ display:flex; justify-content:center; flex-wrap:wrap; gap:20px; }}
+      </style>
     </head>
     <body>
 
-        <form method="post" action="/change">
-            <button class="big-button" type="submit" name="delta" value="1">+1 ☕</button>
-            <button class="big-button" type="submit" name="delta" value="-1"
-                    style="background-color:#f39c12;">-1 ↩</button>
-        </form>
-
-        <div class="counter">
-            Total getrunken: {total}
+      <form method="post" action="/change">
+        <div class="row">
+          <button class="big-button plus" type="submit" name="delta" value="1">+1 ☕</button>
+          <button class="big-button minus" type="submit" name="delta" value="-1">-1 ↩</button>
         </div>
+      </form>
 
-        <form method="get" action="/reset-confirm">
-            <button class="reset-button" type="submit">Reset</button>
-        </form>
+      <div class="counter">Total getrunken: {total}</div>
+
+      <form method="get" action="/reset-confirm">
+        <button class="reset" type="submit">Reset</button>
+      </form>
 
     </body>
     </html>
@@ -113,22 +94,7 @@ def index():
 @app.route("/change", methods=["POST"])
 def change():
     delta = int(request.form["delta"])
-    
-    conn = sqlite3.connect("data.db")
-    c = conn.cursor()
-    
-    if delta == 1:
-        c.execute("UPDATE counter SET value = value + 1 WHERE id = 1")
-    else:
-        # nie unter 0
-        c.execute("""
-            UPDATE counter
-            SET value = CASE WHEN value > 0 THEN value - 1 ELSE 0 END
-            WHERE id = 1
-        """)
-        
-    conn.commit()
-    conn.close()
+    change_total(delta)
     return redirect(url_for("index"))
 
 @app.route("/reset-confirm", methods=["GET"])
@@ -136,39 +102,22 @@ def reset_confirm():
     return """
     <html>
     <head>
-        <style>
-            body {
-                text-align: center;
-                font-family: Arial;
-                margin-top: 150px;
-            }
-            .confirm-button {
-                font-size: 25px;
-                padding: 15px 30px;
-                margin: 20px;
-                border-radius: 10px;
-                border: none;
-            }
-            .yes {
-                background-color: #e74c3c;
-                color: white;
-            }
-            .no {
-                background-color: #95a5a6;
-                color: white;
-            }
-        </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
     </head>
-    <body>
-        <h2>Sicher zurücksetzen?</h2>
+    <body style="text-align:center;font-family:Arial;margin-top:150px;">
+      <h2>Sicher zurücksetzen?</h2>
 
-        <form method="post" action="/reset">
-            <button class="confirm-button yes" type="submit">Ja, zurücksetzen</button>
-        </form>
+      <form method="post" action="/reset">
+        <button style="font-size:25px;padding:15px 30px;background:#e74c3c;color:white;border:none;border-radius:10px;">
+          Ja, zurücksetzen
+        </button>
+      </form>
 
-        <form method="get" action="/">
-            <button class="confirm-button no" type="submit">Abbrechen</button>
-        </form>
+      <form method="get" action="/">
+        <button style="font-size:25px;padding:15px 30px;background:#95a5a6;color:white;border:none;border-radius:10px;margin-top:20px;">
+          Abbrechen
+        </button>
+      </form>
     </body>
     </html>
     """
@@ -178,8 +127,6 @@ def reset():
     reset_counter()
     return redirect(url_for("index"))
 
-# DB initialisieren, auch wenn gunicorn startet
-init_db()
-
+# lokal starten (Render startet via gunicorn)
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)
