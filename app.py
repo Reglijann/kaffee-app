@@ -71,59 +71,91 @@ TEMPLATE = """
 <!doctype html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kaffee</title>
-  <style>
-    body { font-family: system-ui; max-width: 520px; margin: 40px auto; padding: 0 16px; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 18px; }
-    .big { font-size: 56px; font-weight: 800; margin: 12px 0; }
-    button { padding: 14px 18px; font-size: 18px; border-radius: 12px; border: 1px solid #ccc; cursor: pointer; }
-    .row { display:flex; gap: 10px; flex-wrap: wrap; }
-    .muted { color:#666; }
-    .top { display:flex; justify-content: space-between; align-items:center; gap: 10px; }
-    a { color: inherit; }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaffee Counter</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin-top: 50px;
+}
+
+.topbar {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+}
+
+button {
+  font-size: 28px;
+  padding: 20px 40px;
+  margin: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #2c7be5;
+  color: white;
+}
+
+button:hover {
+  background: #1a5dc9;
+}
+
+.admin-btn {
+  font-size: 14px;
+  padding: 8px 12px;
+  background: #444;
+}
+
+.total {
+  font-size: 48px;
+  margin: 40px 0;
+}
+</style>
 </head>
+
 <body>
-  <div class="top">
-    <h2>Kaffee-Zähler</h2>
-    {% if is_admin %}
-      <form method="post" action="{{ url_for('logout') }}">
-        <button type="submit">Admin logout</button>
-      </form>
-    {% else %}
-      <a href="{{ url_for('login') }}" class="muted">Admin login</a>
-    {% endif %}
-  </div>
 
-  <div class="card">
-    <div class="muted">Total getrunken:</div>
-    <div class="big">{{ total }}</div>
+<div class="topbar">
+{% if is_admin %}
+<form method="post" action="{{ url_for('logout') }}">
+<button class="admin-btn">Logout</button>
+</form>
+{% else %}
+<a href="{{ url_for('login') }}">
+<button class="admin-btn">Admin</button>
+</a>
+{% endif %}
+</div>
 
-    {% if is_admin %}
-      <div class="row">
-        <form method="post" action="{{ url_for('change') }}">
-          <input type="hidden" name="delta" value="1">
-          <button type="submit">+1</button>
-        </form>
+<h1>Kaffee Counter ☕</h1>
 
-        <form method="post" action="{{ url_for('change') }}">
-          <input type="hidden" name="delta" value="-1">
-          <button type="submit">-1</button>
-        </form>
+<div class="total">
+Total getrunken: <b>{{ total }}</b>
+</div>
 
-        <form method="get" action="{{ url_for('reset_confirm') }}">
-          <button type="submit">Reset</button>
-        </form>
-      </div>
-      <p class="muted">Admin-Modus aktiv ✅</p>
-    {% else %}
-      <p class="muted">Besucher-Modus: nur anschauen 👀</p>
-    {% endif %}
-  </div>
+{% if is_admin %}
+
+<form method="post" action="/change">
+<input type="hidden" name="delta" value="1">
+<button>+1</button>
+</form>
+
+<form method="post" action="/change">
+<input type="hidden" name="delta" value="-1">
+<button>-1</button>
+</form>
+
+<form method="get" action="/reset-confirm">
+<button>Reset</button>
+</form>
+
+{% endif %}
+
 </body>
 </html>
 """
+
 
 LOGIN_TEMPLATE = """
 <!doctype html>
