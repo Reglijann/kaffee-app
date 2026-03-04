@@ -324,7 +324,7 @@ DASH_TPL = """
         </form>
       </div>
     
-      <form method="post" action="{{ url_for('set_stock', username=username) }}" class="row">
+      <form method="post" action="{{ url_for('stock', username=username) }}" class="row">
         <input name="stock" type="number" step="1" value="{{ stock }}" style="max-width:220px;">
         <button class="btn" type="submit">Speichern</button>
       </form>
