@@ -312,25 +312,29 @@ DASH_TPL = """
     <div class="card" style="margin-top:12px;">
       <h2>Kapselbestand ändern</h2>
     
-      <div class="row" style="margin-bottom:10px;">
-        <form method="post" action="{{ url_for('change', username=username) }}">
+      <div class="row" style="margin-top:10px;">
+        <!-- Schnell hinzufügen -->
+        <form method="post" action="{{ url_for('stock', username=username) }}">
           <input type="hidden" name="delta_stock" value="12">
           <button class="btn light" type="submit">+12</button>
         </form>
     
-        <form method="post" action="{{ url_for('change', username=username) }}">
+        <form method="post" action="{{ url_for('stock', username=username) }}">
           <input type="hidden" name="delta_stock" value="48">
           <button class="btn light" type="submit">+48</button>
         </form>
+    
+        <div class="spacer"></div>
+    
+        <!-- Manuell setzen -->
+        <form method="post" action="{{ url_for('stock', username=username) }}" class="row" style="gap:10px;">
+          <input name="stock" type="number" step="1" value="{{ stock }}" style="max-width:220px;">
+          <button class="btn" type="submit">Speichern</button>
+        </form>
       </div>
     
-      <form method="post" action="{{ url_for('stock', username=username) }}" class="row">
-        <input name="stock" type="number" step="1" value="{{ stock }}" style="max-width:220px;">
-        <button class="btn" type="submit">Speichern</button>
-      </form>
-    
       <div class="muted" style="margin-top:8px;">
-        +12 / +48 wenn ein neues Pack Kapseln kommt.
+        +1 zieht 1 Kapsel ab, -1 gibt 1 Kapsel zurück. Bestand darf auch negativ sein (Schulden).
       </div>
     </div>
 
