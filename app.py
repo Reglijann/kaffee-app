@@ -1,5 +1,8 @@
 import os
 import re
+
+from fitness import init_fitness
+
 from typing import Optional
 
 import psycopg
@@ -279,8 +282,17 @@ DASH_TPL = """
         <h1>{{ username }} ☕</h1>
         <div class="muted">Dein Counter & Kapselbestand</div>
       </div>
+    
       <div class="spacer"></div>
-      <a href="{{ url_for('index') }}"><button class="btn light">Home</button></a>
+    
+      <a href="{{ url_for('fitness_home', username=username) }}">
+        <button class="btn light">Fitness</button>
+      </a>
+    
+      <a href="{{ url_for('index') }}">
+        <button class="btn light">Home</button>
+      </a>
+    
       <form method="post" action="{{ url_for('logout', username=username) }}">
         <button class="btn secondary" type="submit">Logout</button>
       </form>
@@ -584,6 +596,9 @@ def stock(username):
       """, (new_stock, uid))
       
   return redirect(url_for("dashboard", username=username))
+
+
+init_fitness(app, get_conn, require_login, BASE_CSS)
 
 
 # Local dev
