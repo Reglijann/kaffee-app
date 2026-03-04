@@ -50,13 +50,13 @@ def init_fitness(app, get_conn, require_login, base_css: str):
 <!doctype html>
 <html><head>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>{{{{ username }}}} – Fitness</title>
+	<title>{{ username }} – Fitness</title>
 	{base_css}
 	<style>
 		.small { font-size: 13px; color: #666; }
-		textarea {{ padding: 12px; border-radius: 12px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; min-height: 90px; }}
-		select {{ padding: 12px; border-radius: 12px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; background: white; }}
-		table {{ width: 100%; border-collapse: collapse; }}
+		textarea { padding: 12px; border-radius: 12px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; min-height: 90px; }
+		select { padding: 12px; border-radius: 12px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; background: white; }
+		table { width: 100%; border-collapse: collapse; }
 		th, td {{ padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }}
 		.chart {{ width: 100%; overflow-x: auto; }}
 		.chart svg {{ width: 100%; height: 220px; }}
@@ -68,11 +68,11 @@ def init_fitness(app, get_conn, require_login, base_css: str):
 	<div class="card">
 		<div class="row">
 			<div>
-				<h1>Fitness – {{{{ username }}}} 🏋️</h1>
+				<h1>Fitness – {{ username }} 🏋️</h1>
 				<div class="muted">Workouts & Gewicht (nur für dich sichtbar, wenn du eingeloggt bist)</div>
 			</div>
 			<div class="spacer"></div>
-			<a href="{{{{ url_for('dashboard', username=username) }}}}"><button class="btn light">← zurück</button></a>
+			<a href="{{ url_for('dashboard', username=username) }}"><button class="btn light">← zurück</button></a>
 		</div>
 
 		{% with msgs = get_flashed_messages() %}
@@ -85,11 +85,11 @@ def init_fitness(app, get_conn, require_login, base_css: str):
 	<div class="grid2">
 		<div class="card">
 			<h2>Workout eintragen</h2>
-			<form method="post" action="{{{{ url_for('fitness_add_workout', username=username) }}}}">
+			<form method="post" action="{{ url_for('fitness_add_workout', username=username) }}">
 				<div class="grid2">
 					<div>
 						<label class="muted">Tag</label><br>
-						<input name="day" type="date" value="{{{{ today }}}}" required>
+						<input name="day" type="date" value="{{ today }}" required>
 					</div>
 					<div>
 						<label class="muted">Dauer (Minuten)</label><br>
@@ -112,11 +112,11 @@ def init_fitness(app, get_conn, require_login, base_css: str):
 
 		<div class="card">
 			<h2>Gewicht eintragen</h2>
-			<form method="post" action="{{{{ url_for('fitness_add_weight', username=username) }}}}">
+			<form method="post" action="{{ url_for('fitness_add_weight', username=username) }}">
 				<div class="grid2">
 					<div>
 						<label class="muted">Tag</label><br>
-						<input name="day" type="date" value="{{{{ today }}}}" required>
+						<input name="day" type="date" value="{{ today }}" required>
 					</div>
 					<div>
 						<label class="muted">Gewicht (kg)</label><br>
