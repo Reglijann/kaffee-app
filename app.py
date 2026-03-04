@@ -465,25 +465,31 @@ def dashboard(username):
 
 @app.post("/u/<username>/change")
 def change(username):
-    uid = require_login(username)
-    try:
-        delta = int(request.form.get("delta", "0"))
-    except ValueError:
-        delta = 0
-    if delta not in (-1, 1):
-        abort(400)
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            ensure_stats_row(uid)
-            cur.execute("""
-                update stats
-                set total = greatest(0, total + %s),
-                    updated_at = now()
-                where user_id = %s
-            """, (delta, uid))
-
-    return redirect(url_for("dashboard", username=username))
+  uid = require_login(username)
+  
+  try:
+    delta = int(request.form.get("delta", "0"))
+  except ValueError:
+    delta = 0
+    
+  if delta not in (-1, 1):
+    abort(400)
+    
+  with get_conn() as conn:
+    with conn.cursor() as cur:
+      
+      ensure_stats_row(uid)
+      
+      # Kaffee ändern
+      cur.execute("""
+        update stats
+        set total = total + %s,
+          stock = stock - %s,
+          updated_at = now()
+        where user_id = %s
+      """, (delta, delta, uid))
+      
+  return redirect(url_for("dashboard", username=username))
 
 
 @app.get("/u/<username>/reset-confirm")
