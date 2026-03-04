@@ -311,11 +311,27 @@ DASH_TPL = """
 
     <div class="card" style="margin-top:12px;">
       <h2>Kapselbestand ändern</h2>
+    
+      <div class="row" style="margin-bottom:10px;">
+        <form method="post" action="{{ url_for('change', username=username) }}">
+          <input type="hidden" name="delta_stock" value="12">
+          <button class="btn light" type="submit">+12</button>
+        </form>
+    
+        <form method="post" action="{{ url_for('change', username=username) }}">
+          <input type="hidden" name="delta_stock" value="48">
+          <button class="btn light" type="submit">+48</button>
+        </form>
+      </div>
+    
       <form method="post" action="{{ url_for('set_stock', username=username) }}" class="row">
-        <input name="stock" type="number" min="0" step="1" value="{{ stock }}" style="max-width:220px;">
+        <input name="stock" type="number" step="1" value="{{ stock }}" style="max-width:220px;">
         <button class="btn" type="submit">Speichern</button>
       </form>
-      <div class="muted" style="margin-top:8px;">Tragt hier z.B. ein, wie viele Kapseln noch im Schrank sind.</div>
+    
+      <div class="muted" style="margin-top:8px;">
+        +12 / +48 wenn ein neues Pack Kapseln kommt.
+      </div>
     </div>
 
     <div class="card" style="margin-top:12px;">
@@ -511,27 +527,53 @@ def reset(username):
     return redirect(url_for("dashboard", username=username))
 
 
+from flask import abort
+
 @app.post("/u/<username>/stock")
-def set_stock(username):
-    uid = require_login(username)
+def stock(username):
+  uid = require_login(username)
+  
+  # 1) Quick-Buttons: +12 / +48 (oder auch negatives)
+  raw_delta_stock = request.form.get("delta_stock")
+  if raw_delta_stock:
     try:
-        stock = int(request.form.get("stock", "0"))
+      delta_stock = int(raw_delta_stock)
     except ValueError:
-        stock = 0
-    if stock < 0:
-        stock = 0
-
+      abort(400)
+      
     with get_conn() as conn:
-        with conn.cursor() as cur:
-            ensure_stats_row(uid)
-            cur.execute("""
-                update stats
-                set stock = %s,
-                    updated_at = now()
-                where user_id = %s
-            """, (stock, uid))
-
+      with conn.cursor() as cur:
+        ensure_stats_row(uid)
+        cur.execute("""
+          update stats
+          set stock = stock + %s,
+            updated_at = now()
+          where user_id = %s
+        """, (delta_stock, uid))
     return redirect(url_for("dashboard", username=username))
+  
+  # 2) Manuell (so wie bisher)
+  # --- Variante A: absoluten Bestand setzen ---
+  raw_stock = request.form.get("stock")
+  if raw_stock is None:
+    abort(400)
+    
+  try:
+    new_stock = int(raw_stock)
+  except ValueError:
+    abort(400)
+    
+  with get_conn() as conn:
+    with conn.cursor() as cur:
+      ensure_stats_row(uid)
+      cur.execute("""
+        update stats
+        set stock = %s,
+          updated_at = now()
+        where user_id = %s
+      """, (new_stock, uid))
+      
+  return redirect(url_for("dashboard", username=username))
 
 
 # Local dev
