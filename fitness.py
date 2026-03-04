@@ -57,10 +57,10 @@ def init_fitness(app, get_conn, require_login, base_css: str):
 		textarea { padding: 12px; border-radius: 12px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; min-height: 90px; }
 		select { padding: 12px; border-radius: 12px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; background: white; }
 		table { width: 100%; border-collapse: collapse; }
-		th, td {{ padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }}
-		.chart {{ width: 100%; overflow-x: auto; }}
-		.chart svg {{ width: 100%; height: 220px; }}
-		.chip {{ display:inline-block; padding: 6px 10px; border-radius: 999px; background:#f0f2f7; }}
+		th, td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+		.chart { width: 100%; overflow-x: auto; }
+		.chart svg { width: 100%; height: 220px; }
+		.chip { display:inline-block; padding: 6px 10px; border-radius: 999px; background:#f0f2f7; }
 	</style>
 </head><body>
 <div class="wrap">
