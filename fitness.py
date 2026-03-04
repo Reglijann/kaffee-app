@@ -46,7 +46,7 @@ def init_fitness(app, get_conn, require_login, base_css: str):
 								""")
 								cur.execute("create index if not exists idx_weights_user_day on weights(user_id, day desc);")
 							
-		FITNESS_TPL = f"""
+		FITNESS_TPL = """
 <!doctype html>
 <html><head>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
