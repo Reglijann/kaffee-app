@@ -371,6 +371,12 @@ RESET_TPL = """
 # -------------------------
 # Routes
 # -------------------------
+@app.get("/health")
+def health():
+  return "ok", 200
+
+
+
 @app.get("/")
 def index():
     with get_conn() as conn:
