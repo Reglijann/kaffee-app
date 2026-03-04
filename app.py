@@ -1,183 +1,177 @@
 import os
-import sqlite3
+from functools import wraps
 
+from flask import Flask, redirect, render_template_string, request, session, url_for, abort
 import psycopg
-from flask import Flask, redirect, request, url_for
 
 app = Flask(__name__)
-
-# ---------- DB Layer (Postgres via DATABASE_URL, else SQLite) ----------
-
-SQLITE_PATH = "data.db"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 
 
-def get_db_url() -> str | None:
-    return os.environ.get("DATABASE_URL")
-
-
-def is_postgres() -> bool:
-    url = get_db_url()
-    return bool(url) and url.startswith("postgres")
+def get_db_url() -> str:
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL is not set")
+    return db_url
 
 
 def get_conn():
-    """
-    Returns a connection object for either Postgres (psycopg) or SQLite (sqlite3).
-    """
-    if is_postgres():
-        return psycopg.connect(get_db_url())
-    return sqlite3.connect(SQLITE_PATH)
+    # Supabase Pooler URL funktioniert gut auf Render
+    return psycopg.connect(get_db_url())
 
 
 def init_db():
-    """
-    Ensures the 'counter' table exists and row (id=1) exists.
-    Safe to call multiple times.
-    """
-    conn = get_conn()
-    cur = conn.cursor()
-
-    if is_postgres():
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS counter (
-                id INTEGER PRIMARY KEY,
-                value INTEGER NOT NULL DEFAULT 0
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS counter (
+                    id INT PRIMARY KEY,
+                    value INT NOT NULL
+                )
+                """
             )
-        """)
-        cur.execute("""
-            INSERT INTO counter (id, value)
-            VALUES (1, 0)
-            ON CONFLICT (id) DO NOTHING
-        """)
-    else:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS counter (
-                id INTEGER PRIMARY KEY,
-                value INTEGER NOT NULL
-            )
-        """)
-        cur.execute("SELECT COUNT(*) FROM counter WHERE id = 1")
-        if cur.fetchone()[0] == 0:
-            cur.execute("INSERT INTO counter (id, value) VALUES (1, 0)")
-
-    conn.commit()
-    cur.close()
-    conn.close()
+            c.execute("SELECT COUNT(*) FROM counter WHERE id = 1")
+            if c.fetchone()[0] == 0:
+                c.execute("INSERT INTO counter (id, value) VALUES (1, 0)")
+        conn.commit()
 
 
 def get_total() -> int:
     init_db()
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT value FROM counter WHERE id = 1")
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    return int(row[0]) if row else 0
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("SELECT value FROM counter WHERE id = 1")
+            return int(c.fetchone()[0])
 
 
-def set_total(value: int):
+def set_total(new_value: int):
     init_db()
-    conn = get_conn()
-    cur = conn.cursor()
-
-    if is_postgres():
-        cur.execute("UPDATE counter SET value = %s WHERE id = 1", (value,))
-    else:
-        cur.execute("UPDATE counter SET value = ? WHERE id = 1", (value,))
-
-    conn.commit()
-    cur.close()
-    conn.close()
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE counter SET value = %s WHERE id = 1", (new_value,))
+        conn.commit()
 
 
-def change_total(delta: int):
-    total = get_total()
-    total = max(0, total + delta)
-    set_total(total)
+def is_admin() -> bool:
+    return session.get("is_admin") is True
 
 
-def reset_counter():
-    set_total(0)
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not is_admin():
+            abort(403)
+        return fn(*args, **kwargs)
+
+    return wrapper
 
 
-# ---------- Routes / UI ----------
-
-@app.get("/")
-def index():
-    total = get_total()
-    return f"""
+TEMPLATE = """
 <!doctype html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kaffee Zähler</title>
+  <title>Kaffee</title>
   <style>
-    body {{ text-align:center; font-family: Arial, sans-serif; margin: 0; padding: 0; }}
-    .wrap {{ margin-top: 90px; padding: 16px; }}
-    .row {{ display:flex; justify-content:center; gap:18px; flex-wrap:wrap; margin-top: 24px; }}
-    .big {{ font-size: 56px; padding: 36px 70px; border-radius: 22px; border: none; color: white; cursor:pointer; }}
-    .plus {{ background:#2ecc71; }}
-    .minus {{ background:#f39c12; }}
-    .counter {{ font-size: 38px; margin-top: 38px; }}
-    .reset {{ margin-top: 40px; font-size: 18px; padding: 12px 22px; border-radius: 12px; border: none; background:#e74c3c; color:white; cursor:pointer; }}
+    body { font-family: system-ui; max-width: 520px; margin: 40px auto; padding: 0 16px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 18px; }
+    .big { font-size: 56px; font-weight: 800; margin: 12px 0; }
+    button { padding: 14px 18px; font-size: 18px; border-radius: 12px; border: 1px solid #ccc; cursor: pointer; }
+    .row { display:flex; gap: 10px; flex-wrap: wrap; }
+    .muted { color:#666; }
+    .top { display:flex; justify-content: space-between; align-items:center; gap: 10px; }
+    a { color: inherit; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Kaffee</h1>
+  <div class="top">
+    <h2>Kaffee-Zähler</h2>
+    {% if is_admin %}
+      <form method="post" action="{{ url_for('logout') }}">
+        <button type="submit">Admin logout</button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('login') }}" class="muted">Admin login</a>
+    {% endif %}
+  </div>
 
-    <form method="post" action="/change">
+  <div class="card">
+    <div class="muted">Total getrunken:</div>
+    <div class="big">{{ total }}</div>
+
+    {% if is_admin %}
       <div class="row">
-        <button class="big plus" type="submit" name="delta" value="1">+1 ☕</button>
-        <button class="big minus" type="submit" name="delta" value="-1">-1 ↩</button>
+        <form method="post" action="{{ url_for('change') }}">
+          <input type="hidden" name="delta" value="1">
+          <button type="submit">+1</button>
+        </form>
+
+        <form method="post" action="{{ url_for('change') }}">
+          <input type="hidden" name="delta" value="-1">
+          <button type="submit">-1</button>
+        </form>
+
+        <form method="get" action="{{ url_for('reset_confirm') }}">
+          <button type="submit">Reset</button>
+        </form>
       </div>
-    </form>
-
-    <div class="counter">Total getrunken: <b>{total}</b></div>
-
-    <form method="get" action="/reset-confirm">
-      <button class="reset" type="submit">Reset</button>
-    </form>
+      <p class="muted">Admin-Modus aktiv ✅</p>
+    {% else %}
+      <p class="muted">Besucher-Modus: nur anschauen 👀</p>
+    {% endif %}
   </div>
 </body>
 </html>
 """
 
+LOGIN_TEMPLATE = """
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Login</title>
+  <style>
+    body { font-family: system-ui; max-width: 520px; margin: 40px auto; padding: 0 16px; }
+    input, button { padding: 12px 14px; font-size: 16px; border-radius: 10px; border: 1px solid #ccc; }
+    .row { display:flex; gap: 10px; }
+    .err { color: #b00; }
+  </style>
+</head>
+<body>
+  <h2>Admin Login</h2>
+  {% if error %}<p class="err">{{ error }}</p>{% endif %}
+  <form method="post">
+    <div class="row">
+      <input type="password" name="password" placeholder="Admin Passwort" required>
+      <button type="submit">Login</button>
+    </div>
+  </form>
+  <p><a href="{{ url_for('index') }}">Zurück</a></p>
+</body>
+</html>
+"""
 
-@app.post("/change")
-def change():
-    delta = int(request.form["delta"])
-    change_total(delta)
-    return redirect(url_for("index"))
-
-
-@app.get("/reset-confirm")
-def reset_confirm():
-    return """
+RESET_TEMPLATE = """
 <!doctype html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Reset?</title>
   <style>
-    body { text-align:center; font-family: Arial, sans-serif; margin: 0; padding: 0; }
-    .wrap { margin-top: 140px; padding: 16px; }
-    button { font-size: 22px; padding: 14px 26px; border-radius: 12px; border: none; cursor:pointer; }
-    .yes { background:#e74c3c; color:white; }
-    .no { background:#95a5a6; color:white; margin-top: 16px; }
+    body { font-family: system-ui; max-width: 520px; margin: 40px auto; padding: 0 16px; }
+    button { padding: 14px 18px; font-size: 18px; border-radius: 12px; border: 1px solid #ccc; cursor: pointer; }
+    .row { display:flex; gap: 10px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h2>Sicher zurücksetzen?</h2>
-
-    <form method="post" action="/reset">
-      <button class="yes" type="submit">Ja, zurücksetzen</button>
+  <h2>Sicher zurücksetzen?</h2>
+  <div class="row">
+    <form method="post" action="{{ url_for('reset') }}">
+      <button type="submit">Ja, reset</button>
     </form>
-
-    <form method="get" action="/">
-      <button class="no" type="submit">Abbrechen</button>
+    <form method="get" action="{{ url_for('index') }}">
+      <button type="submit">Abbrechen</button>
     </form>
   </div>
 </body>
@@ -185,12 +179,48 @@ def reset_confirm():
 """
 
 
-@app.post("/reset")
-def reset():
-    reset_counter()
+@app.get("/")
+def index():
+    total = get_total()
+    return render_template_string(TEMPLATE, total=total, is_admin=is_admin())
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        pw = request.form.get("password", "")
+        admin_pw = os.environ.get("ADMIN_PASSWORD", "")
+        if admin_pw and pw == admin_pw:
+            session["is_admin"] = True
+            return redirect(url_for("index"))
+        return render_template_string(LOGIN_TEMPLATE, error="Falsches Passwort.")
+    return render_template_string(LOGIN_TEMPLATE, error=None)
+
+
+@app.post("/logout")
+def logout():
+    session.clear()
     return redirect(url_for("index"))
 
 
-if __name__ == "__main__":
-    # Lokal: http://127.0.0.1:5001
-    app.run(host="0.0.0.0", port=5001, debug=True)
+@app.post("/change")
+@admin_required
+def change():
+    delta = int(request.form.get("delta", "0"))
+    total = get_total()
+    total = max(0, total + delta)   # nicht unter 0
+    set_total(total)
+    return redirect(url_for("index"))
+
+
+@app.get("/reset-confirm")
+@admin_required
+def reset_confirm():
+    return render_template_string(RESET_TEMPLATE)
+
+
+@app.post("/reset")
+@admin_required
+def reset():
+    set_total(0)
+    return redirect(url_for("index"))
