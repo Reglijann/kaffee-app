@@ -245,7 +245,7 @@ def init_fitness(app, get_conn, require_login, base_css: str):
 				y2 = (min_w + max_w) / 2
 				y3 = max_w
 			
-				svg = f"""
+				svg = """
 <svg viewBox="0 0 {w} {h}" role="img" aria-label="Gewichtsverlauf">
 	<rect x="0" y="0" width="{w}" height="{h}" fill="white" />
 	<!-- grid -->
