@@ -33,36 +33,42 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         with conn.cursor() as cur:
-
+            
             cur.execute("""
             create table if not exists users(
                 id bigserial primary key,
                 username text unique not null,
                 password_hash text not null,
-                capsule_balance integer not null default 0,
                 created_at timestamptz not null default now()
             )
             """)
-
+            
+            cur.execute("""
+            alter table users
+            add column if not exists capsule_balance integer not null default 0
+            """)
+            
             cur.execute("""
             create table if not exists stats(
                 user_id bigint primary key references users(id) on delete cascade,
                 total integer not null default 0
             )
             """)
-
+            
             cur.execute("""
             create table if not exists global_state(
                 id integer primary key,
                 shared_stock integer not null default 0
             )
             """)
-
+            
             cur.execute("""
             insert into global_state (id, shared_stock)
             values (1,0)
             on conflict (id) do nothing
             """)
+            
+        conn.commit()
 
 
 @app.before_request
