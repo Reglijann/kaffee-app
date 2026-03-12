@@ -78,6 +78,21 @@ def init_db():
                 on conflict (id) do nothing
             """)
 
+            # kaffee-log für letzte Einträge
+            cur.execute("""
+                create table if not exists coffee_log (
+                    id bigserial primary key,
+                    user_id bigint not null references users(id) on delete cascade,
+                    delta integer not null,
+                    created_at timestamptz not null default now()
+                )
+            """)
+
+            cur.execute("""
+                create index if not exists idx_coffee_log_user_created
+                on coffee_log (user_id, created_at desc)
+            """)
+
             cur.execute("""
                 create index if not exists idx_users_username on users (username)
             """)
@@ -181,6 +196,41 @@ def next_to_buy():
 
 
 # -------------------------
+# coffee log
+# -------------------------
+def add_coffee_log(user_id: int, delta: int):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                insert into coffee_log (user_id, delta)
+                values (%s, %s)
+            """, (user_id, delta))
+        conn.commit()
+
+
+def get_recent_coffee_logs(user_id: int, limit: int = 5):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                select delta, created_at
+                from coffee_log
+                where user_id = %s
+                order by created_at desc
+                limit %s
+            """, (user_id, limit))
+            rows = cur.fetchall()
+
+    result = []
+    for delta, created_at in rows:
+        result.append({
+            "delta": int(delta),
+            "label": "+1" if int(delta) > 0 else "-1",
+            "created_at": created_at.strftime("%d.%m.%Y, %H:%M"),
+        })
+    return result
+
+
+# -------------------------
 # UI templates
 # -------------------------
 BASE_CSS = """
@@ -205,6 +255,8 @@ BASE_CSS = """
   .list { display: grid; gap: 10px; }
   .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; background:#f0f2f7; }
   .flash { background: #fff6d6; border: 1px solid #ffe49a; padding: 10px 12px; border-radius: 12px; margin-bottom: 14px; }
+  .log-item { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee; }
+  .log-item:last-child { border-bottom:0; }
 </style>
 """
 
@@ -482,6 +534,21 @@ DASH_TPL = """
     </div>
 
     <div class="card" style="margin-top:12px;">
+      <h2>Letzte 5 Kaffee-Einträge</h2>
+
+      {% if recent_logs %}
+        {% for log in recent_logs %}
+          <div class="log-item">
+            <div>{{ log.created_at }}</div>
+            <div class="pill">{{ log.label }}</div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="muted">Noch keine Kaffee-Einträge vorhanden.</div>
+      {% endif %}
+    </div>
+
+    <div class="card" style="margin-top:12px;">
       <h2>Reset</h2>
       <a href="{{ url_for('reset_confirm', username=username) }}">
         <button class="btn danger">Reset…</button>
@@ -649,6 +716,7 @@ def dashboard(username):
         total=total,
         balance=balance,
         stock=get_shared_stock(),
+        recent_logs=get_recent_coffee_logs(uid, 5),
     )
 
 
@@ -673,6 +741,7 @@ def coffee_plus(username):
         conn.commit()
 
     change_shared_stock(-1)
+    add_coffee_log(uid, 1)
     return redirect(url_for("dashboard", username=username))
 
 
@@ -697,6 +766,7 @@ def coffee_minus(username):
         conn.commit()
 
     change_shared_stock(1)
+    add_coffee_log(uid, -1)
     return redirect(url_for("dashboard", username=username))
 
 
