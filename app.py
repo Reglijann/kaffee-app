@@ -208,26 +208,37 @@ def add_coffee_log(user_id: int, delta: int):
         conn.commit()
 
 
-def get_recent_coffee_logs(user_id: int, limit: int = 5):
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                select delta, created_at
-                from coffee_log
-                where user_id = %s
-                order by created_at desc
-                limit %s
-            """, (user_id, limit))
-            rows = cur.fetchall()
+from zoneinfo import ZoneInfo
 
-    result = []
-    for delta, created_at in rows:
-        result.append({
-            "delta": int(delta),
-            "label": "+1" if int(delta) > 0 else "-1",
-            "created_at": created_at.strftime("%d.%m.%Y, %H:%M"),
-        })
-    return result
+def get_recent_coffee_logs(user_id: int, limit: int = 5):
+  
+  with get_conn() as conn:
+    with conn.cursor() as cur:
+      cur.execute("""
+        select delta, created_at
+        from coffee_log
+        where user_id = %s
+        order by created_at desc
+        limit %s
+      """, (user_id, limit))
+      
+      rows = cur.fetchall()
+      
+  result = []
+  
+  zurich = ZoneInfo("Europe/Zurich")
+  
+  for delta, created_at in rows:
+    
+    local_time = created_at.astimezone(zurich)
+    
+    result.append({
+      "delta": int(delta),
+      "label": "+1" if int(delta) > 0 else "-1",
+      "created_at": local_time.strftime("%d.%m.%Y, %H:%M"),
+    })
+    
+  return result
 
 
 # -------------------------
