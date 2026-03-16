@@ -824,6 +824,44 @@ def reset(username):
         conn.commit()
 
     return redirect(url_for("dashboard", username=username))
+  
+  
+@app.get("/api/coffee")
+def api_coffee():
+  
+  username = request.args.get("user")
+  key = request.args.get("key")
+  
+  if key != os.environ.get("API_KEY"):
+    abort(403)
+    
+  row = get_user_by_username(username)
+  
+  if not row:
+    abort(404)
+    
+  user_id = row[0]
+  
+  with get_conn() as conn:
+    with conn.cursor() as cur:
+      
+      cur.execute("""
+        update stats
+        set total = total + 1,
+          updated_at = now()
+        where user_id = %s
+      """, (user_id,))
+      
+      cur.execute("""
+        update users
+        set capsule_balance = capsule_balance - 1
+        where id = %s
+      """, (user_id,))
+      
+  change_shared_stock(-1)
+  add_coffee_log(user_id, 1)
+  
+  return "ok"
 
 
 # -------------------------
